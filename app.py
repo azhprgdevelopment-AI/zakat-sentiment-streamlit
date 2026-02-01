@@ -48,7 +48,7 @@ st.title(T["title"])
 st.subheader(T["subtitle"])
 
 # =========================
-# Text Input
+# Input Type
 # =========================
 input_type = st.radio(
     "Input Type",
@@ -69,9 +69,8 @@ else:
         type=["csv"]
     )
 
-
 # =========================
-# Analyze Button (Placeholder)
+# Analyze Button
 # =========================
 if st.button(T["analyze"]):
 
@@ -113,8 +112,11 @@ if st.button(T["analyze"]):
                 df["Confidence"] = confidences
                 df["Governance Category"] = categories
 
+                # ---- Table ----
+                st.subheader("Analysis Results")
                 st.dataframe(df)
 
+                # ---- Download ----
                 st.download_button(
                     label="Download Results as CSV",
                     data=df.to_csv(index=False),
@@ -122,3 +124,11 @@ if st.button(T["analyze"]):
                     mime="text/csv"
                 )
 
+                # ---- Charts ----
+                st.subheader("Sentiment Distribution")
+                sentiment_counts = df["Sentiment"].value_counts()
+                st.bar_chart(sentiment_counts)
+
+                st.subheader("Governance Category Distribution")
+                category_counts = df["Governance Category"].value_counts()
+                st.bar_chart(category_counts)
