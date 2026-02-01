@@ -1,6 +1,8 @@
 import streamlit as st
+import pandas as pd
 from inference import simple_sentiment_analysis
 from category_classifier import predict_governance_category
+
 
 # =========================
 # Bilingual Text Dictionary
