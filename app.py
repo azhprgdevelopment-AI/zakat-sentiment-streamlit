@@ -48,21 +48,75 @@ st.subheader(T["subtitle"])
 # =========================
 # Text Input
 # =========================
-user_text = st.text_area(
-    T["input_text"],
-    height=150
+input_type = st.radio(
+    "Input Type",
+    ["Single Text", "CSV File"]
 )
+
+# ---------- SINGLE TEXT ----------
+if input_type == "Single Text":
+    user_text = st.text_area(
+        T["input_text"],
+        height=150
+    )
+
+# ---------- CSV FILE ----------
+else:
+    uploaded_file = st.file_uploader(
+        "Upload CSV file (must contain a 'text' column)",
+        type=["csv"]
+    )
+
 
 # =========================
 # Analyze Button (Placeholder)
 # =========================
 if st.button(T["analyze"]):
-    if user_text.strip() == "":
-        st.warning("Please enter text.")
-    else:
-        sentiment, confidence = simple_sentiment_analysis(user_text)
-        category = predict_governance_category(user_text)
 
-        st.success(f"{T['sentiment']}: {sentiment}")
-        st.info(f"{T['confidence']}: {confidence:.2f}")
-        st.warning(f"{T['category']}: {category}")
+    # ---------- SINGLE TEXT ----------
+    if input_type == "Single Text":
+        if user_text.strip() == "":
+            st.warning("Please enter text.")
+        else:
+            sentiment, confidence = simple_sentiment_analysis(user_text)
+            category = predict_governance_category(user_text)
+
+            st.success(f"{T['sentiment']}: {sentiment}")
+            st.info(f"{T['confidence']}: {confidence:.2f}")
+            st.warning(f"{T['category']}: {category}")
+
+    # ---------- CSV FILE ----------
+    else:
+        if uploaded_file is None:
+            st.warning("Please upload a CSV file.")
+        else:
+            df = pd.read_csv(uploaded_file)
+
+            if "text" not in df.columns:
+                st.error("CSV must contain a column named 'text'")
+            else:
+                sentiments = []
+                confidences = []
+                categories = []
+
+                for t in df["text"]:
+                    s, c = simple_sentiment_analysis(str(t))
+                    cat = predict_governance_category(str(t))
+
+                    sentiments.append(s)
+                    confidences.append(c)
+                    categories.append(cat)
+
+                df["Sentiment"] = sentiments
+                df["Confidence"] = confidences
+                df["Governance Category"] = categories
+
+                st.dataframe(df)
+
+                st.download_button(
+                    label="Download Results as CSV",
+                    data=df.to_csv(index=False),
+                    file_name="zakat_sentiment_results.csv",
+                    mime="text/csv"
+                )
+
