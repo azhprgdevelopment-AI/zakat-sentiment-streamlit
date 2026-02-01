@@ -1,4 +1,6 @@
 import streamlit as st
+from inference import simple_sentiment_analysis
+from category_classifier import predict_governance_category
 
 # =========================
 # Bilingual Text Dictionary
@@ -58,7 +60,9 @@ if st.button(T["analyze"]):
     if user_text.strip() == "":
         st.warning("Please enter text.")
     else:
-        # Placeholder output (AI comes next)
-        st.success(f"{T['sentiment']}: Neutral")
-        st.info(f"{T['confidence']}: 0.00")
-        st.warning(f"{T['category']}: Not yet classified")
+        sentiment, confidence = simple_sentiment_analysis(user_text)
+        category = predict_governance_category(user_text)
+
+        st.success(f"{T['sentiment']}: {sentiment}")
+        st.info(f"{T['confidence']}: {confidence:.2f}")
+        st.warning(f"{T['category']}: {category}")
