@@ -5,13 +5,55 @@ from category_classifier import predict_governance_category
 
 
 # =========================
+# Explanation & Recommendation Helpers
+# =========================
+def explain_sentiment(sentiment, lang):
+    explanations = {
+        "en": {
+            "Positive": "Public perception is generally favourable.",
+            "Neutral": "Public discourse is informational or neutral.",
+            "Negative": "Public dissatisfaction detected and may require attention."
+        },
+        "ms": {
+            "Positive": "Persepsi awam secara umum adalah positif.",
+            "Neutral": "Wacana awam bersifat neutral atau berbentuk maklumat.",
+            "Negative": "Ketidakpuasan awam dikesan dan mungkin memerlukan perhatian."
+        }
+    }
+    return explanations[lang].get(sentiment, "")
+
+
+def recommend_action(category, lang):
+    actions = {
+        "en": {
+            "Leadership Commitment": "Strengthen leadership communication and commitment.",
+            "Stakeholder Engagement": "Enhance engagement with zakat payers and recipients.",
+            "Data Quality & Accessibility": "Improve clarity and accessibility of zakat information.",
+            "Ethical Data Governance": "Ensure transparency and ethical handling of zakat data.",
+            "Technological Readiness": "Upgrade and stabilise digital zakat systems.",
+            "Continuous Evaluation": "Review feedback and improve service processes.",
+            "General Zakat Discourse": "Monitor public discourse for emerging issues."
+        },
+        "ms": {
+            "Leadership Commitment": "Perkukuhkan komunikasi dan komitmen kepimpinan.",
+            "Stakeholder Engagement": "Tingkatkan penglibatan pembayar dan penerima zakat.",
+            "Data Quality & Accessibility": "Perbaiki kejelasan dan kebolehcapaian maklumat zakat.",
+            "Ethical Data Governance": "Pastikan ketelusan dan pengurusan data zakat beretika.",
+            "Technological Readiness": "Naik taraf dan stabilkan sistem zakat digital.",
+            "Continuous Evaluation": "Semak maklum balas dan perbaiki proses perkhidmatan.",
+            "General Zakat Discourse": "Pantau wacana awam untuk isu yang berpotensi."
+        }
+    }
+    return actions[lang].get(category, "")
+
+
+# =========================
 # Bilingual Text Dictionary
 # =========================
 TEXT = {
     "en": {
         "title": "Zakat Sentiment Intelligence System",
         "subtitle": "AI-powered analysis of zakat discourse",
-        "language": "Language",
         "input_text": "Enter social media text",
         "analyze": "Analyze",
         "sentiment": "Sentiment",
@@ -21,7 +63,6 @@ TEXT = {
     "ms": {
         "title": "Sistem Analisis Sentimen Zakat",
         "subtitle": "Analisis wacana zakat berasaskan AI",
-        "language": "Bahasa",
         "input_text": "Masukkan teks media sosial",
         "analyze": "Analisis",
         "sentiment": "Sentimen",
@@ -86,6 +127,9 @@ if st.button(T["analyze"]):
             st.info(f"{T['confidence']}: {confidence:.2f}")
             st.warning(f"{T['category']}: {category}")
 
+            st.caption(explain_sentiment(sentiment, lang_code))
+            st.caption(recommend_action(category, lang_code))
+
     # ---------- CSV FILE ----------
     else:
         if uploaded_file is None:
@@ -112,11 +156,9 @@ if st.button(T["analyze"]):
                 df["Confidence"] = confidences
                 df["Governance Category"] = categories
 
-                # ---- Table ----
                 st.subheader("Analysis Results")
                 st.dataframe(df)
 
-                # ---- Download ----
                 st.download_button(
                     label="Download Results as CSV",
                     data=df.to_csv(index=False),
@@ -124,11 +166,12 @@ if st.button(T["analyze"]):
                     mime="text/csv"
                 )
 
-                # ---- Charts ----
                 st.subheader("Sentiment Distribution")
-                sentiment_counts = df["Sentiment"].value_counts()
-                st.bar_chart(sentiment_counts)
+                st.bar_chart(df["Sentiment"].value_counts())
 
                 st.subheader("Governance Category Distribution")
-                category_counts = df["Governance Category"].value_counts()
-                st.bar_chart(category_counts)
+                st.bar_chart(df["Governance Category"].value_counts())
+
+                st.subheader("Interpretation & Recommended Actions")
+                dominant_category = df["Governance Category"].value_counts().idxmax()
+                st.markdown(recommend_action(dominant_category, lang_code))
