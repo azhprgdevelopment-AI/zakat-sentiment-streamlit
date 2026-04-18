@@ -1,11 +1,37 @@
 import streamlit as st
 import pandas as pd
-from inference import simple_sentiment_analysis
+
+from ensemble_inference import (
+    load_base_models,
+    load_boosting_model,
+    ensemble_predict
+)
+
 from category_classifier import predict_governance_category
 
 
 # =========================
-# Explanation & Recommendation Helpers
+# LOAD MODELS (RUN ONCE)
+# =========================
+@st.cache_resource
+def load_models():
+    model_paths = {
+        "bert": "models/Zakat-bert-base-uncased",
+        "distilbert": "models/Zakat-distilbert-base-uncased"
+    }
+
+    loaded_models = load_base_models(model_paths)
+    boosting_model = load_boosting_model("models/boosting_model.pkl")
+
+    return loaded_models, boosting_model
+
+
+loaded_models, boosting_model = load_models()
+st.write("Models loaded:", type(loaded_models))
+
+
+# =========================
+# Explanation & Recommendation
 # =========================
 def explain_sentiment(sentiment, lang):
     explanations = {
@@ -48,166 +74,103 @@ def recommend_action(category, lang):
 
 
 # =========================
-# Bilingual Text Dictionary
+# Language
 # =========================
 TEXT = {
     "en": {
         "title": "Zakat Sentiment Intelligence System",
         "subtitle": "AI-powered analysis of zakat discourse",
-        "input_text": "Enter social media text",
+        "input_text": "Enter text",
         "multi_input": "Enter multiple texts (one per line)",
-        "analyze": "Analyze",
-        "sentiment": "Sentiment",
-        "confidence": "Confidence",
-        "category": "Governance Category"
+        "analyze": "Analyze"
     },
     "ms": {
         "title": "Sistem Analisis Sentimen Zakat",
         "subtitle": "Analisis wacana zakat berasaskan AI",
-        "input_text": "Masukkan teks media sosial",
+        "input_text": "Masukkan teks",
         "multi_input": "Masukkan banyak teks (satu baris setiap teks)",
-        "analyze": "Analisis",
-        "sentiment": "Sentimen",
-        "confidence": "Keyakinan",
-        "category": "Kategori Tadbir Urus"
+        "analyze": "Analisis"
     }
 }
 
-# =========================
-# Language Selector
-# =========================
-lang = st.sidebar.selectbox(
-    "Language / Bahasa",
-    ["English", "Bahasa Malaysia"]
-)
-
+lang = st.sidebar.selectbox("Language / Bahasa", ["English", "Bahasa Malaysia"])
 lang_code = "en" if lang == "English" else "ms"
 T = TEXT[lang_code]
 
+
 # =========================
-# App Header
+# UI
 # =========================
 st.title(T["title"])
 st.subheader(T["subtitle"])
 
-# =========================
-# Input Type
-# =========================
 input_type = st.radio(
     "Input Type",
     ["Single Text", "Multiple Text", "CSV File"]
 )
 
-# ---------- INPUT SECTION ----------
 if input_type == "Single Text":
-    user_text = st.text_area(T["input_text"], height=150)
+    user_text = st.text_area(T["input_text"])
 
 elif input_type == "Multiple Text":
-    multi_text = st.text_area(T["multi_input"], height=200)
+    multi_text = st.text_area(T["multi_input"])
 
 else:
-    uploaded_file = st.file_uploader(
-        "Upload CSV file (must contain a 'text' column)",
-        type=["csv"]
-    )
+    uploaded_file = st.file_uploader("Upload CSV (column: text)", type=["csv"])
+
 
 # =========================
-# Analyze Button
+# ANALYZE
 # =========================
 if st.button(T["analyze"]):
 
-    # ---------- SINGLE TEXT ----------
+    # ---------- SINGLE ----------
     if input_type == "Single Text":
-        if user_text.strip() == "":
-            st.warning("Please enter text.")
-        else:
-            sentiment, confidence = simple_sentiment_analysis(user_text)
-            category = predict_governance_category(user_text)
+        texts = [user_text]
 
-            st.success(f"{T['sentiment']}: {sentiment}")
-            st.info(f"{T['confidence']}: {confidence:.2f}")
-            st.warning(f"{T['category']}: {category}")
-
-            st.caption(explain_sentiment(sentiment, lang_code))
-            st.caption(recommend_action(category, lang_code))
-
-    # ---------- MULTIPLE TEXT ----------
     elif input_type == "Multiple Text":
-        if multi_text.strip() == "":
-            st.warning("Please enter text.")
-        else:
-            texts = [t for t in multi_text.split("\n") if t.strip() != ""]
+        texts = [t for t in multi_text.split("\n") if t.strip() != ""]
 
-            sentiments = []
-            confidences = []
-            categories = []
-
-            for t in texts:
-                s, c = simple_sentiment_analysis(t)
-                cat = predict_governance_category(t)
-
-                sentiments.append(s)
-                confidences.append(c)
-                categories.append(cat)
-
-            df = pd.DataFrame({
-                "Text": texts,
-                "Sentiment": sentiments,
-                "Confidence": confidences,
-                "Governance Category": categories
-            })
-
-            st.subheader("Analysis Results")
-            st.dataframe(df)
-
-            st.subheader("Sentiment Distribution")
-            st.bar_chart(df["Sentiment"].value_counts())
-
-            st.subheader("Governance Category Distribution")
-            st.bar_chart(df["Governance Category"].value_counts())
-
-    # ---------- CSV FILE ----------
     else:
         if uploaded_file is None:
-            st.warning("Please upload a CSV file.")
-        else:
-            df = pd.read_csv(uploaded_file)
+            st.warning("Upload CSV first.")
+            st.stop()
 
-            if "text" not in df.columns:
-                st.error("CSV must contain a column named 'text'")
-            else:
-                sentiments = []
-                confidences = []
-                categories = []
+        df = pd.read_csv(uploaded_file)
 
-                for t in df["text"]:
-                    s, c = simple_sentiment_analysis(str(t))
-                    cat = predict_governance_category(str(t))
+        if "text" not in df.columns:
+            st.error("CSV must have 'text' column")
+            st.stop()
 
-                    sentiments.append(s)
-                    confidences.append(c)
-                    categories.append(cat)
+        texts = df["text"].astype(str).tolist()
 
-                df["Sentiment"] = sentiments
-                df["Confidence"] = confidences
-                df["Governance Category"] = categories
+    # 🔥 ENSEMBLE PREDICTION
+    st.write("✅ USING ENSEMBLE MODEL")
+    sentiments, confidences = ensemble_predict(
+        texts,
+        loaded_models,
+        boosting_model
+    )
 
-                st.subheader("Analysis Results")
-                st.dataframe(df)
+    categories = [predict_governance_category(t) for t in texts]
 
-                st.download_button(
-                    label="Download Results as CSV",
-                    data=df.to_csv(index=False),
-                    file_name="zakat_sentiment_results.csv",
-                    mime="text/csv"
-                )
+    results_df = pd.DataFrame({
+        "Text": texts,
+        "Sentiment": sentiments,
+        "Confidence": confidences,
+        "Governance Category": categories
+    })
 
-                st.subheader("Sentiment Distribution")
-                st.bar_chart(df["Sentiment"].value_counts())
+    st.subheader("Results")
+    st.dataframe(results_df)
 
-                st.subheader("Governance Category Distribution")
-                st.bar_chart(df["Governance Category"].value_counts())
+    st.subheader("Sentiment Distribution")
+    st.bar_chart(results_df["Sentiment"].value_counts())
 
-                st.subheader("Interpretation & Recommended Actions")
-                dominant_category = df["Governance Category"].value_counts().idxmax()
-                st.markdown(recommend_action(dominant_category, lang_code))
+    st.subheader("Governance Category Distribution")
+    st.bar_chart(results_df["Governance Category"].value_counts())
+
+    # Explanation (single input only)
+    if input_type == "Single Text":
+        st.caption(explain_sentiment(sentiments[0], lang_code))
+        st.caption(recommend_action(categories[0], lang_code))
