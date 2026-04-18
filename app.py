@@ -55,6 +55,7 @@ TEXT = {
         "title": "Zakat Sentiment Intelligence System",
         "subtitle": "AI-powered analysis of zakat discourse",
         "input_text": "Enter social media text",
+        "multi_input": "Enter multiple texts (one per line)",
         "analyze": "Analyze",
         "sentiment": "Sentiment",
         "confidence": "Confidence",
@@ -64,6 +65,7 @@ TEXT = {
         "title": "Sistem Analisis Sentimen Zakat",
         "subtitle": "Analisis wacana zakat berasaskan AI",
         "input_text": "Masukkan teks media sosial",
+        "multi_input": "Masukkan banyak teks (satu baris setiap teks)",
         "analyze": "Analisis",
         "sentiment": "Sentimen",
         "confidence": "Keyakinan",
@@ -93,17 +95,16 @@ st.subheader(T["subtitle"])
 # =========================
 input_type = st.radio(
     "Input Type",
-    ["Single Text", "CSV File"]
+    ["Single Text", "Multiple Text", "CSV File"]
 )
 
-# ---------- SINGLE TEXT ----------
+# ---------- INPUT SECTION ----------
 if input_type == "Single Text":
-    user_text = st.text_area(
-        T["input_text"],
-        height=150
-    )
+    user_text = st.text_area(T["input_text"], height=150)
 
-# ---------- CSV FILE ----------
+elif input_type == "Multiple Text":
+    multi_text = st.text_area(T["multi_input"], height=200)
+
 else:
     uploaded_file = st.file_uploader(
         "Upload CSV file (must contain a 'text' column)",
@@ -129,6 +130,41 @@ if st.button(T["analyze"]):
 
             st.caption(explain_sentiment(sentiment, lang_code))
             st.caption(recommend_action(category, lang_code))
+
+    # ---------- MULTIPLE TEXT ----------
+    elif input_type == "Multiple Text":
+        if multi_text.strip() == "":
+            st.warning("Please enter text.")
+        else:
+            texts = [t for t in multi_text.split("\n") if t.strip() != ""]
+
+            sentiments = []
+            confidences = []
+            categories = []
+
+            for t in texts:
+                s, c = simple_sentiment_analysis(t)
+                cat = predict_governance_category(t)
+
+                sentiments.append(s)
+                confidences.append(c)
+                categories.append(cat)
+
+            df = pd.DataFrame({
+                "Text": texts,
+                "Sentiment": sentiments,
+                "Confidence": confidences,
+                "Governance Category": categories
+            })
+
+            st.subheader("Analysis Results")
+            st.dataframe(df)
+
+            st.subheader("Sentiment Distribution")
+            st.bar_chart(df["Sentiment"].value_counts())
+
+            st.subheader("Governance Category Distribution")
+            st.bar_chart(df["Governance Category"].value_counts())
 
     # ---------- CSV FILE ----------
     else:
